@@ -19,4 +19,6 @@ RUN pg_ctlcluster 17 main start \
 
 USER postgres
 
-CMD ["/usr/lib/postgresql/17/bin/postgres", "-g", "/var/lib/postgresql/17/main", "-c", "config_file=/etc/postgresql/17/main/postgresql.conf"]
+VOLUME ["/var/lib/postgresql/17/main"]
+
+CMD ["/usr/lib/postgresql/17/bin/postgres", "-D", "/var/lib/postgresql/17/main", "-c", "config_file=/etc/postgresql/17/main/postgresql.conf"]
