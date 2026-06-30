@@ -6,8 +6,8 @@ ENV APP_DB="appdb"
 
 COPY init.sql /tmp/init.sql
 
-RUN apt -y update && apt install -y postgresql \
-    && pg_ctlcluster 17 main start \
+RUN apt-get -y update && apt-get install -y postgresql
+RUN pg_ctlcluster 17 main start \
     && su postgres -c "psql -c \"CREATE ROLE $APP_USER WITH LOGIN PASSWORD '$APP_PASS';\"" \
     && su postgres -c "psql -c \"CREATE DATABASE $APP_DB OWNER $APP_USER;\"" \
     && su postgres -c "psql -v ON_ERROR_STOP=1 -d $APP_DB -f /tmp/init.sql" \
@@ -19,4 +19,4 @@ RUN apt -y update && apt install -y postgresql \
 
 USER postgres
 
-CMD ["/usr/lib/postgresql/17/bin/postgres", "-D", "/var/lib/postgresql/17/main", "-c", "config_file=/etc/postgresql/17/main/postgresql.conf"]
+CMD ["/usr/lib/postgresql/17/bin/postgres", "-g", "/var/lib/postgresql/17/main", "-c", "config_file=/etc/postgresql/17/main/postgresql.conf"]
