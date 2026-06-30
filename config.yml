@@ -1,11 +1,11 @@
 variant: fcos
 version: 1.5.0
 
-passwd:
-  users:
-    - name: core
-      ssh_authorized_keys:
-        - ${SSH_KEY}
+# passwd:
+#   users:
+#     - name: core
+#       ssh_authorized_keys:
+#         - ${SSH_KEY}
 
 storage:
   directories:
@@ -14,6 +14,10 @@ storage:
     - path: /opt/app/db
       mode: 0755
     - path: /opt/app/web
+      mode: 0755
+    - path: /var/lib/app
+      mode: 0755
+    - path: /var/lib/app/postgresql
       mode: 0755
 
   files:
@@ -54,13 +58,12 @@ storage:
           #!/usr/bin/env bash
           set -euo pipefail
 
-          podman volume exists my-volume || podman volume create my-volume
-          podman network exists my-network || podman network create my-network
+          podman network exists app-network || podman network create app-network
 
-          podman build -t localhost/my-db:latest /opt/app/db
-          podman build -t localhost/my-web:latest /opt/app/web
+          podman build -t localhost/app-db:latest /opt/app/db
+          podman build -t localhost/app-web:latest /opt/app/web
 
-          touch /var/lib/build-images.done
+          exit 0
 
 systemd:
   units:
@@ -94,13 +97,15 @@ systemd:
         RestartSec=5
 
         ExecStartPre=-/usr/bin/podman rm -f db
+        ExecStartPre=/usr/bin/bash -c 'if [ ! -s /var/lib/app/postgresql/PG_VERSION ] && /usr/bin/podman volume exists app-volume; then /usr/bin/podman run --rm --user root --entrypoint /bin/sh -v app-volume:/old:Z,U -v /var/lib/app/postgresql:/target:Z,U localhost/app-db:latest -c "cp -a /old/. /target/"; fi'
+        ExecStartPre=/usr/bin/podman run --rm --user root --entrypoint /bin/sh -v /var/lib/app/postgresql:/target:Z,U localhost/app-db:latest -c 'if [ ! -s /target/PG_VERSION ]; then cp -a /var/lib/postgresql/17/main/. /target/; fi; chown -R postgres:postgres /target; chmod 700 /target'
 
         ExecStart=/usr/bin/podman run \
           --name db \
-          --network my-network \
+          --network app-network \
           -p 5432:5432 \
-          -v my-volume:/var/lib/postgresql/data:U \
-          localhost/my-db:latest
+          -v /var/lib/app/postgresql:/var/lib/postgresql/17/main:Z,U \
+          localhost/app-db:latest
 
         ExecStop=/usr/bin/podman stop -t 10 db
 
@@ -112,8 +117,8 @@ systemd:
       contents: |
         [Unit]
         Description=Web application container
-        Requires=db.service
-        After=db.service
+        Requires=build-images.service
+        After=build-images.service
 
         [Service]
         Restart=always
@@ -123,9 +128,9 @@ systemd:
 
         ExecStart=/usr/bin/podman run \
           --name web \
-          --network my-network \
+          --network app-network \
           -p 3000:3000 \
-          localhost/my-web:latest
+          localhost/app-web:latest
 
         ExecStop=/usr/bin/podman stop -t 10 web
 
