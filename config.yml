@@ -8,7 +8,45 @@ passwd:
         - ${SSH_KEY}
 
 storage:
+  directories:
+    - path: /opt/app
+      mode: 0755
+    - path: /opt/app/db
+      mode: 0755
+    - path: /opt/app/web
+      mode: 0755
+
   files:
+    - path: /opt/app/db/Dockerfile
+      mode: 0644
+      contents:
+        local: db/Dockerfile
+
+    - path: /opt/app/db/init.sql
+      mode: 0644
+      contents:
+        local: db/init.sql
+
+    - path: /opt/app/web/Dockerfile
+      mode: 0644
+      contents:
+        local: web/Dockerfile
+
+    - path: /opt/app/web/package-lock.json
+      mode: 0644
+      contents:
+        local: web/package-lock.json
+
+    - path: /opt/app/web/package.json
+      mode: 0644
+      contents:
+        local: web/package.json
+
+    - path: /opt/app/web/server.js
+      mode: 0644
+      contents:
+        local: web/server.js
+
     - path: /usr/local/bin/build-images.sh
       mode: 0755
       contents:
@@ -16,12 +54,8 @@ storage:
           #!/usr/bin/env bash
           set -euo pipefail
 
-          mkdir -p /opt/app
-          curl -L http://192.168.56.1:8080/app.tar.gz -o /tmp/app.tar.gz
-          tar xzf /tmp/app.tar.gz -C /opt/app
-
-          podman volume create my-volume
-          podman network create my-network
+          podman volume exists my-volume || podman volume create my-volume
+          podman network exists my-network || podman network create my-network
 
           podman build -t localhost/my-db:latest /opt/app/db
           podman build -t localhost/my-web:latest /opt/app/web

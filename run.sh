@@ -20,12 +20,12 @@ tar -czf app.tar.gz db web
 
 # python -m http.server 8080 &
 
-if VBoxManage list runningvms | grep -q "\"$VM\""; then
-  VBoxManage controlvm "$VM" poweroff
-  sleep 10
-fi
-
-VBoxManage unregistervm "$VM" --delete
+# if VBoxManage list runningvms | grep -q "\"$VM\""; then
+#   VBoxManage controlvm "$VM" poweroff
+#   sleep 10
+# fi
+#
+# VBoxManage unregistervm "$VM" --delete
 
 VBoxManage import "$OVA" --vsys 0 --vmname "$VM"
 VBoxManage modifyvm "$VM" --nic2 hostonly --hostonlyadapter2 vboxnet0
