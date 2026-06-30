@@ -7,7 +7,7 @@ const port = 3000;
 app.use(express.urlencoded({ extended: true }));
 
 const pool = new Pool({
-  host: "pg-test",
+  host: "db",
   port: 5432,
   user: "appuser",
   password: "123mudar",

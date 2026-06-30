@@ -1,6 +1,12 @@
 variant: fcos
 version: 1.5.0
 
+passwd:
+  users:
+    - name: core
+      ssh_authorized_keys:
+        - ${SSH_KEY}
+
 storage:
   files:
     - path: /usr/local/bin/build-images.sh
@@ -14,32 +20,13 @@ storage:
           curl -L http://192.168.56.1:8080/app.tar.gz -o /tmp/app.tar.gz
           tar xzf /tmp/app.tar.gz -C /opt/app
 
+          podman volume create my-volume
+          podman network create my-network
+
           podman build -t localhost/my-db:latest /opt/app/db
           podman build -t localhost/my-web:latest /opt/app/web
 
           touch /var/lib/build-images.done
-
-    - path: /usr/local/bin/wait-for-db.sh
-      mode: 0755
-      contents:
-        inline: |
-          #!/usr/bin/env bash
-          set -euo pipefail
-
-          echo "[INFO] Waiting for database..."
-
-          for i in {1..60}; do
-            if podman exec db pg_isready -U appuser -d appdb >/dev/null 2>&1; then
-              echo "[INFO] Database is ready."
-              exit 0
-            fi
-
-            echo "[INFO] Database not ready yet..."
-            sleep 2
-          done
-
-          echo "[ERROR] Database did not become ready in time."
-          exit 1
 
 systemd:
   units:
@@ -60,29 +47,13 @@ systemd:
         [Install]
         WantedBy=multi-user.target
 
-    - name: app-network.service
-      enabled: true
-      contents: |
-        [Unit]
-        Description=Create Podman app network
-        Wants=network-online.target
-        After=network-online.target
-
-        [Service]
-        Type=oneshot
-        RemainAfterExit=yes
-        ExecStart=/bin/bash -c '/usr/bin/podman network exists appnet || /usr/bin/podman network create appnet'
-
-        [Install]
-        WantedBy=multi-user.target
-
     - name: db.service
       enabled: true
       contents: |
         [Unit]
         Description=PostgreSQL database container
-        Requires=build-images.service app-network.service
-        After=build-images.service app-network.service
+        Requires=build-images.service
+        After=build-images.service
 
         [Service]
         Restart=always
@@ -92,12 +63,9 @@ systemd:
 
         ExecStart=/usr/bin/podman run \
           --name db \
-          --network appnet \
+          --network my-network \
           -p 5432:5432 \
-          -e POSTGRES_DB=appdb \
-          -e POSTGRES_USER=appuser \
-          -e POSTGRES_PASSWORD=123mudar \
-          -v db-data:/var/lib/postgresql/data:Z \
+          -v my-volume:/var/lib/postgresql/data:U \
           localhost/my-db:latest
 
         ExecStop=/usr/bin/podman stop -t 10 db
@@ -117,18 +85,12 @@ systemd:
         Restart=always
         RestartSec=5
 
-        ExecStartPre=/usr/local/bin/wait-for-db.sh
         ExecStartPre=-/usr/bin/podman rm -f web
 
         ExecStart=/usr/bin/podman run \
           --name web \
-          --network appnet \
+          --network my-network \
           -p 3000:3000 \
-          -e DB_HOST=db \
-          -e DB_PORT=5432 \
-          -e DB_NAME=appdb \
-          -e DB_USER=appuser \
-          -e DB_PASS=123mudar \
           localhost/my-web:latest
 
         ExecStop=/usr/bin/podman stop -t 10 web
