@@ -1,0 +1,39 @@
+variant: fcos
+version: 1.5.0
+
+storage:
+  files:
+    - path: /usr/local/bin/build-images.sh
+      mode: 0755
+      contents:
+        inline: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          mkdir -p /opt/app
+          curl -L http://192.168.56.1:8080/app.tar.gz -o /tmp/app.tar.gz
+          tar xzf /tmp/app.tar.gz -C /opt/app
+
+          podman build -t localhost/my-db:latest /opt/app/db
+          podman build -t localhost/my-web:latest /opt/app/web
+
+          touch /var/lib/build-images.done
+
+systemd:
+  units:
+    - name: build-images.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Download source and build local container images
+        Wants=network-online.target
+        After=network-online.target
+        ConditionPathExists=!/var/lib/build-images.done
+
+        [Service]
+        Type=oneshot
+        ExecStart=/usr/local/bin/build-images.sh
+        RemainAfterExit=yes
+
+        [Install]
+        WantedBy=multi-user.target
