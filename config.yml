@@ -129,7 +129,7 @@ systemd:
         ExecStart=/usr/bin/podman run \
           --name web \
           --network app-network \
-          -p 3000:3000 \
+          -p 80:3000 \
           localhost/app-web:latest
 
         ExecStop=/usr/bin/podman stop -t 10 web
